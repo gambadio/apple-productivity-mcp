@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -7,7 +8,7 @@ test('the local MCP advertises Apple Mail, Calendar, and Reminders read/write to
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: ['src/index.js'],
-    cwd: new URL('..', import.meta.url).pathname
+    cwd: fileURLToPath(new URL('..', import.meta.url))
   });
   const client = new Client({ name: 'apple-productivity-mcp-test', version: '1.0.0' });
   await client.connect(transport);
