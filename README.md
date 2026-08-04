@@ -2,6 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![macOS](https://img.shields.io/badge/macOS-only-black.svg)](https://www.apple.com/macos/)
+[![npm version](https://img.shields.io/npm/v/%40gambadio%2Fapple-productivity-mcp.svg)](https://www.npmjs.com/package/@gambadio/apple-productivity-mcp)
 
 An on-demand, local [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that gives Claude Code and Codex controlled access to Apple Mail, Calendar, and Reminders on macOS.
 
@@ -30,7 +31,43 @@ Check Node before installing:
 node --version
 ```
 
-## Install from GitHub
+## Install from npm
+
+No clone or global installation is required. `npx` downloads and caches the package, and the MCP client launches it as a local stdio child process only when a session connects.
+
+### Claude Code
+
+```bash
+claude mcp add --transport stdio --scope user apple-productivity-local -- \
+  npx -y @gambadio/apple-productivity-mcp@latest
+```
+
+Verify the registration:
+
+```bash
+claude mcp get apple-productivity-local
+claude mcp list
+```
+
+### Codex
+
+```bash
+codex mcp add apple-productivity-local -- \
+  npx -y @gambadio/apple-productivity-mcp@latest
+```
+
+Verify the registration:
+
+```bash
+codex mcp get apple-productivity-local
+codex mcp list
+```
+
+For a reproducible installation, replace `@latest` with a version such as `@2.1.1`.
+
+## Install from source
+
+Use a source checkout when developing the server or when you want to run a specific Git commit.
 
 Clone the repository and install its locked dependencies:
 
@@ -49,7 +86,7 @@ APPLE_MCP_SERVER="$(pwd)/src/index.js"
 
 Paths containing spaces are supported. Keep the quotes in the commands below.
 
-### Claude Code
+### Claude Code with a source checkout
 
 Install the server for your user account:
 
@@ -65,7 +102,7 @@ claude mcp get apple-productivity-local
 claude mcp list
 ```
 
-### Codex
+### Codex with a source checkout
 
 Install the same local stdio server in Codex:
 
@@ -147,7 +184,9 @@ Mail defaults to the account name `iCloud` and mailbox `INBOX` when a caller doe
 
 ## Update
 
-Because both clients store absolute paths, an in-place update keeps the registration valid:
+Registrations using the npm command with `@latest` resolve the latest published version when a new MCP process starts. Start a new Claude Code or Codex session after a release. Pin an explicit version if automatic upgrades are not desirable.
+
+For a source checkout, update in place so the stored absolute path remains valid:
 
 ```bash
 cd /absolute/path/to/apple-productivity-mcp
@@ -163,7 +202,7 @@ claude mcp remove apple-productivity-local --scope user
 codex mcp remove apple-productivity-local
 ```
 
-Removing the registration does not delete the cloned repository or change Apple data.
+Removing the registration does not clear npm's cache, delete a cloned repository, or change Apple data.
 
 ## Development and verification
 

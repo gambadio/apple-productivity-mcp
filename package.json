@@ -1,6 +1,7 @@
 {
-  "name": "apple-productivity-mcp",
-  "version": "2.1.0",
+  "name": "@gambadio/apple-productivity-mcp",
+  "version": "2.1.1",
+  "mcpName": "io.github.gambadio/apple-productivity-mcp",
   "description": "On-demand local Apple Mail, Calendar, and Reminders MCP server for Claude Code and Codex.",
   "main": "src/index.js",
   "bin": {
@@ -9,7 +10,8 @@
   "files": [
     "src",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "server.json"
   ],
   "directories": {
     "test": "test"
@@ -39,6 +41,9 @@
     "url": "https://github.com/gambadio/apple-productivity-mcp/issues"
   },
   "homepage": "https://github.com/gambadio/apple-productivity-mcp#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=20"
   },
