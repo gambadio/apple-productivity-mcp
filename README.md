@@ -25,17 +25,22 @@ The server publishes MCP tool annotations for read-only, idempotent, destructive
 - Claude Code, Codex CLI/app/IDE extension, or another stdio-capable MCP client
 - Permission for the client that launches the server to automate the relevant Apple apps
 
-Check Node before installing:
+## Install from npm
+
+This is the recommended installation method. No repository clone or global package installation is required. `npx` downloads and caches the published package, and the MCP client launches it as a local stdio child process when a session connects.
+
+Confirm that Node.js and `npx` are available:
 
 ```bash
 node --version
+npx --version
 ```
 
-## Install from npm
-
-No clone or global installation is required. `npx` downloads and caches the package, and the MCP client launches it as a local stdio child process only when a session connects.
+The examples use `@latest` so new sessions resolve the newest published release. Replace it with an explicit version such as `@2.1.1` when you want a reproducible, pinned installation.
 
 ### Claude Code
+
+Add the server to your user configuration so it is available in every project:
 
 ```bash
 claude mcp add --transport stdio --scope user apple-productivity-local -- \
@@ -49,7 +54,11 @@ claude mcp get apple-productivity-local
 claude mcp list
 ```
 
-### Codex
+Start a new Claude Code session after adding the server. If the name is already registered, remove it with `claude mcp remove apple-productivity-local --scope user` and run the add command again.
+
+### Codex app, CLI, and IDE extension
+
+Add the server to Codex's user configuration:
 
 ```bash
 codex mcp add apple-productivity-local -- \
@@ -63,7 +72,52 @@ codex mcp get apple-productivity-local
 codex mcp list
 ```
 
-For a reproducible installation, replace `@latest` with a version such as `@2.1.1`.
+The Codex app, CLI, and IDE extension share this MCP configuration on the same Mac. Start a new session after installation; restart an already-open app or IDE extension so it reloads the configuration. In the Codex CLI, `/mcp` shows the active servers.
+
+If the name is already registered, run `codex mcp remove apple-productivity-local` and add it again.
+
+### Other local MCP clients
+
+Use these values in any client that can launch a local stdio MCP server:
+
+| Setting | Value |
+| --- | --- |
+| Name | `apple-productivity-local` |
+| Transport | `stdio` |
+| Command | `npx` |
+| Arguments | `-y`, `@gambadio/apple-productivity-mcp@latest` |
+| Environment variables | None |
+| Working directory | None required |
+
+Clients that accept the common JSON configuration shape can use:
+
+```json
+{
+  "mcpServers": {
+    "apple-productivity-local": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@gambadio/apple-productivity-mcp@latest"
+      ]
+    }
+  }
+}
+```
+
+The outer configuration key and file location vary by client. In a graphical setup screen, select **STDIO** and enter the command and arguments from the table. This pattern applies to local MCP clients such as Claude Desktop, Cursor, Windsurf, Cline, and compatible editors; consult the client's documentation for where it stores MCP configuration.
+
+If a desktop client cannot find `npx`, run this in Terminal:
+
+```bash
+command -v npx
+```
+
+Then replace `"command": "npx"` with the returned absolute path, for example `"command": "/usr/local/bin/npx"`.
+
+Restart the client or open a new session after changing its MCP configuration. Clients that support only remote HTTP servers cannot run this MCP directly because Apple Productivity MCP intentionally uses local stdio and macOS automation.
+
+You do **not** need to run `npm start`, install the package globally, keep a terminal open, configure an API key, or expose a network port.
 
 ## Install from source
 
@@ -120,7 +174,7 @@ codex mcp list
 
 Codex stores this in its user configuration, shared by the Codex app, CLI, and IDE extension on the same host. Start a new session after installation. If a desktop app or IDE extension was already open, restart it so it reloads the MCP configuration.
 
-You do **not** need to run `npm start` or keep a terminal open. Claude Code or Codex launches the server as a child process when it establishes the MCP connection.
+You do **not** need to run `npm start` or keep a terminal open. The MCP client launches the source checkout as a child process when it establishes the MCP connection.
 
 ## Grant macOS permission
 
@@ -234,7 +288,17 @@ Run the corresponding discovery tool and use the exact returned name. Names are 
 
 ### `spawn ... ENOENT`
 
-The configured Node or server path no longer exists. Remove and re-add the MCP registration using fresh values from `command -v node` and `pwd`.
+For an npm installation, run `command -v npx` and use the returned absolute path as the configured command. For a source checkout, remove and re-add the MCP registration using fresh values from `command -v node` and `pwd`.
+
+### npm package cannot be downloaded
+
+Confirm that the public package is reachable and that the client has internet access for the first installation:
+
+```bash
+npm view @gambadio/apple-productivity-mcp version
+```
+
+After the package has been downloaded, npm can reuse its local cache for that version.
 
 ### Server is registered but tools do not appear
 
