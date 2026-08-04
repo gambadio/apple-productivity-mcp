@@ -12,8 +12,8 @@ test('mail mutations select the local Mail.app id rather than the RFC Message-ID
   await client.updateMailStatus({ mailId: '42', isRead: true });
 
   assert.equal(call.args.mailId, '42');
-  assert.match(call.script, /item\.id\(\).*input\.mailId/);
-  assert.doesNotMatch(call.script, /item\.messageId\(\).*input\.messageId/);
+  assert.match(call.script, /messages\.byId\(numericMailId\)/);
+  assert.doesNotMatch(call.script, /messageId/);
 });
 
 test('calendar update rejects a no-op before accessing Calendar.app', async () => {
