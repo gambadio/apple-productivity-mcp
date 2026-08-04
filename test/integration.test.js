@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -7,7 +8,7 @@ async function withClient(run) {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: ['src/index.js'],
-    cwd: new URL('..', import.meta.url).pathname
+    cwd: fileURLToPath(new URL('..', import.meta.url))
   });
   const client = new Client({ name: 'apple-productivity-mcp-integration-test', version: '1.0.0' });
   await client.connect(transport);
@@ -26,9 +27,9 @@ function toolText(result) {
 
 const integrationTest = process.env.RUN_APPLE_INTEGRATION === '1' ? test : test.skip;
 
-integrationTest('Apple Mail tool can read local metadata through the MCP', async () => {
+integrationTest('Apple Mail discovery tool can read local account metadata through the MCP', async () => {
   await withClient(async (client) => {
-    const result = await client.callTool({ name: 'apple_mail_list', arguments: { limit: 1 } });
+    const result = await client.callTool({ name: 'apple_mail_list_accounts', arguments: {} });
     const text = toolText(result);
     assert.ok(Array.isArray(JSON.parse(text)));
   });

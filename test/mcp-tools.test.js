@@ -18,11 +18,13 @@ test('the local MCP advertises Apple Mail, Calendar, and Reminders read/write to
     assert.deepEqual(names, [
       'apple_calendar_create_event',
       'apple_calendar_delete_event',
+      'apple_calendar_list_calendars',
       'apple_calendar_list_events',
       'apple_calendar_update_event',
       'apple_mail_delete',
       'apple_mail_get',
       'apple_mail_list',
+      'apple_mail_list_accounts',
       'apple_mail_move',
       'apple_mail_send',
       'apple_mail_update_status',
@@ -30,16 +32,20 @@ test('the local MCP advertises Apple Mail, Calendar, and Reminders read/write to
       'apple_reminders_create',
       'apple_reminders_delete',
       'apple_reminders_list',
+      'apple_reminders_list_lists',
       'apple_reminders_update'
     ]);
     const readTool = result.tools.find((tool) => tool.name === 'apple_mail_list');
     const sendTool = result.tools.find((tool) => tool.name === 'apple_mail_send');
+    const updateTool = result.tools.find((tool) => tool.name === 'apple_mail_update_status');
     const deleteTool = result.tools.find((tool) => tool.name === 'apple_calendar_delete_event');
     assert.match(readTool.description, /read-only/i);
     assert.equal(readTool.annotations?.readOnlyHint, true);
     assert.match(sendTool.description, /immediately sends/i);
     assert.equal(sendTool.annotations?.openWorldHint, true);
     assert.equal(sendTool.annotations?.destructiveHint, false);
+    assert.equal(updateTool.annotations?.destructiveHint, true);
+    assert.equal(updateTool.annotations?.idempotentHint, true);
     assert.match(deleteTool.description, /destructive/i);
     assert.equal(deleteTool.annotations?.destructiveHint, true);
     assert.equal(deleteTool.annotations?.openWorldHint, true);

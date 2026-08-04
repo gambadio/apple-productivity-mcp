@@ -5,7 +5,13 @@ import { z } from 'zod';
 import { createAppleClient } from './apple-client.js';
 
 const apple = createAppleClient();
-const server = new McpServer({ name: 'apple-productivity-local', version: '2.0.0' });
+const server = new McpServer(
+  { name: 'apple-productivity-local', version: '2.1.0' },
+  {
+    instructions:
+      'This server controls the user\'s local Apple Mail, Calendar, and Reminders apps. Use the discovery tools when exact account, mailbox, calendar, or list names are unknown. Treat sends, moves, updates, completions, and deletions as real external actions that may sync to other devices or providers.'
+  }
+);
 
 function asToolResult(value) {
   return { content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] };
@@ -29,10 +35,29 @@ function useApple(action) {
 }
 
 const READ_ONLY_TOOLS = new Set([
-  'apple_mail_list', 'apple_mail_get', 'apple_calendar_list_events', 'apple_reminders_list'
+  'apple_mail_list_accounts',
+  'apple_mail_list',
+  'apple_mail_get',
+  'apple_calendar_list_calendars',
+  'apple_calendar_list_events',
+  'apple_reminders_list_lists',
+  'apple_reminders_list'
 ]);
 const DESTRUCTIVE_TOOLS = new Set([
-  'apple_mail_delete', 'apple_calendar_delete_event', 'apple_reminders_delete'
+  'apple_mail_update_status',
+  'apple_mail_move',
+  'apple_mail_delete',
+  'apple_calendar_update_event',
+  'apple_calendar_delete_event',
+  'apple_reminders_update',
+  'apple_reminders_complete',
+  'apple_reminders_delete'
+]);
+const IDEMPOTENT_TOOLS = new Set([
+  'apple_mail_update_status',
+  'apple_calendar_update_event',
+  'apple_reminders_update',
+  'apple_reminders_complete'
 ]);
 
 function annotationsFor(name) {
@@ -45,23 +70,34 @@ function annotationsFor(name) {
   return {
     readOnlyHint: false,
     destructiveHint: DESTRUCTIVE_TOOLS.has(name),
-    idempotentHint: false,
+    idempotentHint: IDEMPOTENT_TOOLS.has(name),
     // Mail, Calendar, and Reminders may sync through iCloud, CalDAV, Exchange, or another provider.
     openWorldHint: true
   };
 }
 
 function registerTool(name, description, inputSchema, action) {
-  return server.tool(name, description, inputSchema, annotationsFor(name), action);
+  return server.registerTool(
+    name,
+    { description, inputSchema, annotations: annotationsFor(name) },
+    action
+  );
 }
 
-const account = z.string().default('iCloud').describe('Apple Mail account name.');
-const mailbox = z.string().default('INBOX').describe('Mailbox name, normally INBOX.');
+const account = z.string().min(1).default('iCloud').describe('Apple Mail account name.');
+const mailbox = z.string().min(1).default('INBOX').describe('Mailbox name, normally INBOX.');
 const mailId = z.string().min(1).describe('Local Mail message id returned by apple_mail_list.');
 const limit = z.number().int().min(1).max(100);
 const isoDate = z.string().datetime({ offset: true });
 const calendar = z.string().min(1).describe('Calendar name.');
 const reminderId = z.string().min(1).describe('Reminder id returned by apple_reminders_list.');
+
+registerTool(
+  'apple_mail_list_accounts',
+  'Read-only: list local Apple Mail account names, sender addresses, and mailbox names. Use this before other Mail tools when the exact names are unknown.',
+  {},
+  useApple(() => apple.listMailAccounts())
+);
 
 registerTool(
   'apple_mail_list',
@@ -113,6 +149,13 @@ registerTool(
 );
 
 registerTool(
+  'apple_calendar_list_calendars',
+  'Read-only: list local Calendar.app calendar names and whether each calendar is writable. Use this before creating or modifying events when the exact calendar name is unknown.',
+  {},
+  useApple(() => apple.listCalendars())
+);
+
+registerTool(
   'apple_calendar_list_events',
   'Read-only: list local Calendar.app events in a time range.',
   {
@@ -160,6 +203,13 @@ registerTool(
   'Delete an existing local Calendar.app event. This is destructive.',
   { calendar, uid: z.string().min(1) },
   useApple((input) => apple.deleteCalendarEvent(input))
+);
+
+registerTool(
+  'apple_reminders_list_lists',
+  'Read-only: list local Apple Reminders list names and IDs. Use this before creating reminders when the exact list name is unknown.',
+  {},
+  useApple(() => apple.listReminderLists())
 );
 
 registerTool(

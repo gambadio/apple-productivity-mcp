@@ -5,6 +5,17 @@ const execFileAsync = promisify(execFile);
 const MAX_LIMIT = 100;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const MAIL_ACCOUNTS_SCRIPT = String.raw`
+function run() {
+  const Mail = Application('Mail');
+  return JSON.stringify(Mail.accounts().map((account) => ({
+    name: String(account.name() || ''),
+    emailAddresses: (account.emailAddresses() || []).map(String),
+    mailboxes: account.mailboxes().map((mailbox) => String(mailbox.name() || ''))
+  })));
+}
+`;
+
 const MAIL_LIST_SCRIPT = String.raw`
 function run(argv) {
   const input = JSON.parse(argv[0] || '{}');
@@ -13,8 +24,10 @@ function run(argv) {
   if (!account.exists()) throw new Error('Mail account not found: ' + input.account);
   const mailbox = account.mailboxes.byName(input.mailbox);
   if (!mailbox.exists()) throw new Error('Mailbox not found: ' + input.mailbox);
-  const messages = mailbox.messages();
-  const result = messages.slice(0, input.limit).map((message) => ({
+  // JXA collection slices use an inclusive end index. Slice the object specifier before
+  // resolving it so Mail.app does not return the entire mailbox for a small request.
+  const messages = mailbox.messages.slice(0, input.limit - 1)();
+  const result = messages.map((message) => ({
     mailId: String(message.id() || ''),
     messageId: String(message.messageId() || ''),
     sender: String(message.sender() || ''),
@@ -32,9 +45,13 @@ function run(argv) {
   const input = JSON.parse(argv[0] || '{}');
   const Mail = Application('Mail');
   const account = Mail.accounts.byName(input.account);
+  if (!account.exists()) throw new Error('Mail account not found: ' + input.account);
   const mailbox = account.mailboxes.byName(input.mailbox);
-  const message = mailbox.messages().find((item) => String(item.id() || '') === input.mailId);
-  if (!message) throw new Error('Message not found in mailbox: ' + input.mailbox);
+  if (!mailbox.exists()) throw new Error('Mailbox not found: ' + input.mailbox);
+  const numericMailId = Number(input.mailId);
+  if (!Number.isFinite(numericMailId)) throw new Error('Invalid Mail message id: ' + input.mailId);
+  const message = mailbox.messages.byId(numericMailId);
+  if (!message.exists()) throw new Error('Message not found in mailbox: ' + input.mailbox);
   return JSON.stringify({
     mailId: String(message.id() || ''),
     messageId: String(message.messageId() || ''),
@@ -54,8 +71,10 @@ function run(argv) {
   const Mail = Application('Mail');
   const account = Mail.accounts.byName(input.account);
   if (!account.exists()) throw new Error('Mail account not found: ' + input.account);
+  const senderAddresses = account.emailAddresses();
+  if (!senderAddresses.length) throw new Error('Mail account has no sender address: ' + input.account);
   const message = Mail.OutgoingMessage({subject: input.subject, content: input.body, visible: false});
-  message.sender = account.emailAddresses()[0];
+  message.sender = senderAddresses[0];
   for (const address of input.to) message.toRecipients.push(Mail.ToRecipient({address}));
   for (const address of input.cc) message.ccRecipients.push(Mail.CcRecipient({address}));
   for (const address of input.bcc) message.bccRecipients.push(Mail.BccRecipient({address}));
@@ -73,21 +92,33 @@ function run(argv) {
   if (!account.exists()) throw new Error('Mail account not found: ' + input.account);
   const mailbox = account.mailboxes.byName(input.mailbox);
   if (!mailbox.exists()) throw new Error('Mailbox not found: ' + input.mailbox);
-  const message = mailbox.messages().find((item) => String(item.id() || '') === input.mailId);
-  if (!message) throw new Error('Message not found in mailbox: ' + input.mailbox);
+  const numericMailId = Number(input.mailId);
+  if (!Number.isFinite(numericMailId)) throw new Error('Invalid Mail message id: ' + input.mailId);
+  const message = mailbox.messages.byId(numericMailId);
+  if (!message.exists()) throw new Error('Message not found in mailbox: ' + input.mailbox);
   if (input.operation === 'set_status') {
     if (typeof input.isRead === 'boolean') message.readStatus = input.isRead;
     if (typeof input.isFlagged === 'boolean') message.flaggedStatus = input.isFlagged;
   } else if (input.operation === 'move') {
     const destination = account.mailboxes.byName(input.targetMailbox);
     if (!destination.exists()) throw new Error('Destination mailbox not found: ' + input.targetMailbox);
-    message.move({to: destination});
+    Mail.move(message, {to: destination});
   } else if (input.operation === 'delete') {
-    message.delete();
+    Mail.delete(message);
   } else {
     throw new Error('Unknown mail operation: ' + input.operation);
   }
   return JSON.stringify({mailId: input.mailId, operation: input.operation, success: true});
+}
+`;
+
+const CALENDAR_LIST_CALENDARS_SCRIPT = String.raw`
+function run() {
+  const Calendar = Application('Calendar');
+  return JSON.stringify(Calendar.calendars().map((calendar) => ({
+    name: String(calendar.name() || ''),
+    writable: Boolean(calendar.writable())
+  })));
 }
 `;
 
@@ -101,10 +132,14 @@ function run(argv) {
   for (const calendar of Calendar.calendars()) {
     const calendarName = String(calendar.name());
     if (input.calendars.length && !input.calendars.includes(calendarName)) continue;
-    for (const event of calendar.events()) {
+    const events = calendar.events.whose({
+      startDate: {_lessThanEquals: end},
+      endDate: {_greaterThanEquals: start}
+    })();
+    for (const event of events) {
       const startsAt = event.startDate();
       const endsAt = event.endDate();
-      if (!startsAt || startsAt > end || (endsAt && endsAt < start)) continue;
+      if (!startsAt) continue;
       output.push({
         uid: String(event.uid() || ''),
         calendar: calendarName,
@@ -157,11 +192,21 @@ function run(argv) {
     if (input.notes !== undefined) event.description = input.notes;
     if (input.allDay !== undefined) event.allDayEvent = input.allDay;
   } else if (input.operation === 'delete') {
-    event.delete();
+    Calendar.delete(event);
   } else {
     throw new Error('Unknown calendar operation: ' + input.operation);
   }
   return JSON.stringify({uid: input.uid, operation: input.operation, success: true});
+}
+`;
+
+const REMINDERS_LIST_LISTS_SCRIPT = String.raw`
+function run() {
+  const Reminders = Application('Reminders');
+  return JSON.stringify(Reminders.lists().map((list) => ({
+    id: String(list.id() || ''),
+    name: String(list.name() || '')
+  })));
 }
 `;
 
@@ -170,20 +215,31 @@ function run(argv) {
   const input = JSON.parse(argv[0] || '{}');
   const Reminders = Application('Reminders');
   const output = [];
-  for (const list of Reminders.lists()) {
-    const listName = String(list.name());
+  const lists = Reminders.lists();
+  const listNames = Reminders.lists.name();
+  for (let listIndex = 0; listIndex < lists.length; listIndex += 1) {
+    const list = lists[listIndex];
+    const listName = String(listNames[listIndex] || '');
     if (input.lists.length && !input.lists.includes(listName)) continue;
-    for (const reminder of list.reminders()) {
-      const completed = Boolean(reminder.completed());
-      if (!input.includeCompleted && completed) continue;
-      const dueAt = reminder.dueDate();
+    // Fetch each property in a batch. Calling five properties on every reminder
+    // individually creates hundreds of Apple Events on a large list.
+    const reminders = input.includeCompleted
+      ? list.reminders
+      : list.reminders.whose({completed: false});
+    const ids = reminders.id();
+    const titles = reminders.name();
+    const dueDates = reminders.dueDate();
+    const completions = reminders.completed();
+    const priorities = reminders.priority();
+    for (let reminderIndex = 0; reminderIndex < ids.length; reminderIndex += 1) {
+      const dueAt = dueDates[reminderIndex];
       output.push({
-        id: String(reminder.id() || ''),
+        id: String(ids[reminderIndex] || ''),
         list: listName,
-        title: String(reminder.name() || ''),
+        title: String(titles[reminderIndex] || ''),
         dueAt: dueAt ? dueAt.toISOString() : null,
-        completed,
-        priority: Number(reminder.priority() || 0)
+        completed: Boolean(completions[reminderIndex]),
+        priority: Number(priorities[reminderIndex] || 0)
       });
     }
   }
@@ -230,7 +286,7 @@ function run(argv) {
   } else if (input.operation === 'complete') {
     reminder.completed = true;
   } else if (input.operation === 'delete') {
-    reminder.delete();
+    Reminders.delete(reminder);
   } else {
     throw new Error('Unknown reminders operation: ' + input.operation);
   }
@@ -267,15 +323,15 @@ function textOrUndefined(value, label) {
 async function runJxa(script, args) {
   try {
     const { stdout } = await execFileAsync(
-      'osascript',
+      '/usr/bin/osascript',
       ['-l', 'JavaScript', '-e', script, JSON.stringify(args)],
-      { timeout: 15000, maxBuffer: 1024 * 1024 }
+      { timeout: 30000, maxBuffer: 1024 * 1024 }
     );
     return stdout.trim();
   } catch (error) {
     if (error?.killed || error?.signal === 'SIGTERM') {
       throw new Error(
-        'Apple automation timed out after 15 seconds. Grant the app that launches Claude Code (usually Terminal) permission to control the requested Apple app in System Settings > Privacy & Security > Automation, then retry.'
+        'Apple automation timed out after 30 seconds. Grant the app that launches your MCP client permission to control the requested Apple app in System Settings > Privacy & Security > Automation, then retry.'
       );
     }
     const details = [error.stderr, error.message].filter(Boolean).join(' ').trim();
@@ -304,6 +360,10 @@ function mutationArgs(input, { id, operation }) {
 
 export function createAppleClient(runScript = runJxa) {
   return {
+    async listMailAccounts() {
+      return parseJson(await runScript(MAIL_ACCOUNTS_SCRIPT, {}), 'Mail', true);
+    },
+
     async listMail({ account = 'iCloud', mailbox = 'INBOX', limit = 20 } = {}) {
       const args = { account: String(account), mailbox: String(mailbox), limit: normalizeLimit(limit) };
       return parseJson(await runScript(MAIL_LIST_SCRIPT, args), 'Mail', true);
@@ -342,6 +402,10 @@ export function createAppleClient(runScript = runJxa) {
     async deleteMail({ account = 'iCloud', mailbox = 'INBOX', mailId } = {}) {
       const args = mutationArgs({ account: String(account), mailbox: String(mailbox), mailId }, { id: 'mailId', operation: 'delete' });
       return parseJson(await runScript(MAIL_MUTATION_SCRIPT, args), 'Mail');
+    },
+
+    async listCalendars() {
+      return parseJson(await runScript(CALENDAR_LIST_CALENDARS_SCRIPT, {}), 'Calendar', true);
     },
 
     async listCalendarEvents({ start, end, calendars = [], limit = 50 } = {}) {
@@ -391,6 +455,10 @@ export function createAppleClient(runScript = runJxa) {
       if (!calendar) throw new Error('calendar is required');
       const args = mutationArgs({ calendar: String(calendar), uid }, { id: 'uid', operation: 'delete' });
       return parseJson(await runScript(CALENDAR_MUTATION_SCRIPT, args), 'Calendar');
+    },
+
+    async listReminderLists() {
+      return parseJson(await runScript(REMINDERS_LIST_LISTS_SCRIPT, {}), 'Reminders', true);
     },
 
     async listReminders({ lists = [], includeCompleted = false, limit = 50 } = {}) {

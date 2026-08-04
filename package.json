@@ -1,8 +1,16 @@
 {
   "name": "apple-productivity-mcp",
-  "version": "2.0.0",
-  "description": "Local Apple Mail, Calendar, and Reminders MCP server for Claude Code.",
-  "main": "index.js",
+  "version": "2.1.0",
+  "description": "On-demand local Apple Mail, Calendar, and Reminders MCP server for Claude Code and Codex.",
+  "main": "src/index.js",
+  "bin": {
+    "apple-productivity-mcp": "src/index.js"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "directories": {
     "test": "test"
   },
@@ -11,12 +19,35 @@
     "start": "node src/index.js",
     "test:integration": "RUN_APPLE_INTEGRATION=1 node --test test/integration.test.js"
   },
-  "keywords": [],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "macos",
+    "apple-mail",
+    "apple-calendar",
+    "apple-reminders",
+    "claude-code",
+    "codex"
+  ],
   "author": "Ricky",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gambadio/apple-productivity-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gambadio/apple-productivity-mcp/issues"
+  },
+  "homepage": "https://github.com/gambadio/apple-productivity-mcp#readme",
+  "engines": {
+    "node": ">=20"
+  },
+  "os": [
+    "darwin"
+  ],
   "type": "module",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "zod": "^4.4.3"
   }
 }
