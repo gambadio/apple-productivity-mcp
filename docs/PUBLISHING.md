@@ -121,8 +121,6 @@ Upload the tested MCPB and checksum to the corresponding GitHub release. The [MC
 
 [DISTRIBUTION.md](DISTRIBUTION.md) records verified listing states and submission paths. Update existing entries rather than duplicating them. Only report a destination as published after reading back its public listing; a submission receipt or open PR means pending review.
 
-Smithery is excluded from this release at the maintainer's request. No Smithery submission or hosted deployment is planned.
-
-Claude Desktop extensions have a separate [submission form](https://clau.de/desktop-extention-submission), linked from [Claude's official desktop documentation](https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop).
+Smithery and the Anthropic/Claude directory are excluded from this release at the maintainer's request. No submission to either destination or hosted deployment is planned. The downloadable local MCPB remains available as a generic release artifact.
 
 Do not submit this package as a hosted HTTP connector or a Linux Docker server. Its Apple app actions require an interactive macOS user session and that user's permissions.

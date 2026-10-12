@@ -6,7 +6,7 @@ Validation host: macOS 27, Apple Silicon, Node.js 26.8.1. Checks performed on 20
 
 The final default `npm test` run passed **66 tests**, with **15 opt-in live tests skipped** and no failures. The suite exercises the fixed JXA dispatchers against synthetic app objects, validates input schemas, tests filesystem boundaries with temporary files, and initializes the real stdio MCP server. Live app checks are skipped unless explicitly enabled. Message-send fixtures never send real email or Messages.
 
-The production dependency audit reported **zero vulnerabilities**. Release validation also covers npm package contents, official MCP Registry metadata schema, and the MCPB manifest. The bundle builder starts both its staged and unpacked runtime and compares the advertised tool catalogs. These checks do not constitute a Claude Desktop or Cline installation test.
+The production dependency audit reported **zero vulnerabilities**. Release validation also covers npm package contents, official MCP Registry metadata schema, and the MCPB manifest. The bundle builder starts both its staged and unpacked runtime and compares the advertised tool catalogs. Both the staged and unpacked MCPB exposed 133 tools. These checks do not constitute a Claude Desktop or Cline installation test.
 
 ## Live app checks
 
@@ -38,6 +38,6 @@ npm run test:personal-integration
 RUN_IWORK_INTEGRATION=1 node --test test/iwork-tools.test.js
 ```
 
-The last command creates and removes a synthetic TextEdit document and temporary file. The other live suites perform read-only discovery but may launch apps. Keep the test document untouched while the TextEdit lifecycle runs. CI runs isolated tests on macOS with Node.js 20 and 24; check the linked workflow result for a specific commit before treating its checks as passed.
+The last command creates and removes a synthetic TextEdit document and temporary file. The other live suites perform read-only discovery but may launch apps. Keep the test document untouched while the TextEdit lifecycle runs. The [macOS CI run](https://github.com/gambadio/apple-productivity-mcp/actions/runs/38246020019) passed on Node.js 20 and 24. The [release workflow](https://github.com/gambadio/apple-productivity-mcp/actions/runs/38246372801) also passed. A fresh-cache installation of the public npm 3.0.0 package returned version 3.0.0 and all 133 default tools through the MCP handshake; no app actions were invoked in that package check.
 
 Implementation details and source references: [iWork/TextEdit](iwork-notes.md), [personal apps](personal-notes.md), [sources](SOURCES.md), and [tool reference](TOOLS.md).

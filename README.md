@@ -2,7 +2,7 @@
 
 A local macOS MCP server for working with Apple's productivity apps, documents, files, and media from Codex, Claude Code, Claude Desktop, and other stdio MCP clients.
 
-**133 tools across 17 groups**, plus optional execution of explicitly allowlisted Shortcuts. Runs on your Mac through Apple's automation interfaces. No hosted service, listening port, subscription, or Apple API key is required.
+**Version 3.0.0: 133 tools across 17 groups**, plus optional execution of explicitly allowlisted Shortcuts. Runs on your Mac through Apple's automation interfaces. No hosted service, listening port, subscription, or Apple API key is required.
 
 [Tool reference](docs/TOOLS.md) · [Machine-readable schemas](docs/tools.json) · [Verification](docs/VERIFICATION.md) · [Source documentation](docs/SOURCES.md) · [Changelog](CHANGELOG.md) · [Publishing](docs/PUBLISHING.md) · [Directory status](docs/DISTRIBUTION.md)
 
@@ -74,7 +74,7 @@ Add this to the client's MCP configuration, then restart it:
 }
 ```
 
-For a reproducible install, replace `@latest` with `@3.0.0`. A local `.mcpb` extension can also be built using the [packaging instructions](docs/PUBLISHING.md); artifact availability is recorded on the GitHub release. This package requires execution on the user's Mac and cannot access their apps from a Linux container or remote hosting service.
+For a reproducible install, replace `@latest` with `@3.0.0`. A tested local [`.mcpb` bundle and checksum](https://github.com/gambadio/apple-productivity-mcp/releases/tag/v3.0.0) are available in the GitHub release. See the [packaging instructions](docs/PUBLISHING.md) to build one yourself. This package requires execution on the user's Mac and cannot access their apps from a Linux container or remote hosting service.
 
 ## Configuration
 
