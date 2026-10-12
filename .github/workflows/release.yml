@@ -72,7 +72,7 @@ jobs:
             if (existing !== packed.integrity) throw Error('Published npm version differs from the local artifact. Bump the version.');
             console.log('Matching npm artifact already published; continuing the release.');
           } else {
-            execFileSync('npm', ['publish', `dist/${packed.filename}`, '--access', 'public'], { stdio: 'inherit' });
+            execFileSync('npm', ['publish', `./dist/${packed.filename}`, '--access', 'public'], { stdio: 'inherit' });
           }
           const publishedIntegrity = JSON.parse(execFileSync('npm', ['view', `${pkg.name}@${pkg.version}`, 'dist.integrity', '--json'], { encoding: 'utf8' }));
           if (publishedIntegrity !== packed.integrity) throw Error('npm artifact readback does not match the release.');
