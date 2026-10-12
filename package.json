@@ -1,8 +1,8 @@
 {
   "name": "@gambadio/apple-productivity-mcp",
-  "version": "2.1.1",
+  "version": "3.0.0",
   "mcpName": "io.github.gambadio/apple-productivity-mcp",
-  "description": "On-demand local Apple Mail, Calendar, and Reminders MCP server for Claude Code and Codex.",
+  "description": "Local macOS MCP suite: Mail, Calendar, Reminders, Notes, Contacts, iWork, files, Safari, media, and Shortcuts.",
   "main": "src/index.js",
   "bin": {
     "apple-productivity-mcp": "src/index.js"
@@ -11,7 +11,11 @@
     "src",
     "README.md",
     "LICENSE",
-    "server.json"
+    "server.json",
+    "docs",
+    "manifest.json",
+    "glama.json",
+    "CHANGELOG.md"
   ],
   "directories": {
     "test": "test"
@@ -19,7 +23,10 @@
   "scripts": {
     "test": "node --test",
     "start": "node src/index.js",
-    "test:integration": "RUN_APPLE_INTEGRATION=1 node --test test/integration.test.js"
+    "test:integration": "RUN_APPLE_INTEGRATION=1 node --test test/integration.test.js",
+    "docs:tools": "node scripts/generate-tool-docs.mjs",
+    "test:personal-integration": "RUN_APPLE_PERSONAL_INTEGRATION=1 node --test test/personal-integration.test.js",
+    "bundle": "node scripts/build-mcpb.mjs"
   },
   "keywords": [
     "mcp",
@@ -29,7 +36,20 @@
     "apple-calendar",
     "apple-reminders",
     "claude-code",
-    "codex"
+    "codex",
+    "apple-notes",
+    "apple-contacts",
+    "pages",
+    "numbers",
+    "keynote",
+    "safari",
+    "photos",
+    "music",
+    "messages",
+    "shortcuts",
+    "finder",
+    "icloud",
+    "apple-productivity"
   ],
   "author": "Ricky",
   "license": "MIT",
@@ -52,7 +72,7 @@
   ],
   "type": "module",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.30.0",
+    "@modelcontextprotocol/sdk": "1.32.1",
     "zod": "^4.4.3"
   }
 }

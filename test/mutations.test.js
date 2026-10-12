@@ -55,3 +55,21 @@ test('completing a reminder calls the local Reminders mutation script with its i
   assert.match(call.script, /completed\s*=\s*true/);
   assert.deepEqual(result, { id: 'reminder-1', completed: true });
 });
+
+test('Mail send reports submission without dereferencing a sent outgoing object', async () => {
+  const { default: vm } = await import('node:vm');
+  let sent = false;
+  const outgoing = {
+    toRecipients: [], ccRecipients: [], bccRecipients: [],
+    send() { sent = true; return true; },
+    messageId() { throw new Error('Outgoing messages have no messageId property'); }
+  };
+  const account = { exists: () => true, emailAddresses: () => ['sender@example.com'] };
+  const app = { accounts: { byName: () => account }, OutgoingMessage: () => outgoing, ToRecipient: x => x, outgoingMessages: [] };
+  const client = createAppleClient(async (script, input) => vm.runInNewContext(script + '\nrun(argv)', {Application: () => app, argv: [JSON.stringify(input)]}));
+  const result = await client.sendMail({to: ['recipient@example.com'], subject: 'Fixture', body: 'Fixture'});
+  assert.equal(sent, true);
+  assert.equal(result.sent, true);
+  assert.equal(result.messageId, null);
+  assert.equal(result.deliveryVerified, false);
+});

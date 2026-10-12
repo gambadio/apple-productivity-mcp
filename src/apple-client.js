@@ -79,8 +79,10 @@ function run(argv) {
   for (const address of input.cc) message.ccRecipients.push(Mail.CcRecipient({address}));
   for (const address of input.bcc) message.bccRecipients.push(Mail.BccRecipient({address}));
   Mail.outgoingMessages.push(message);
-  message.send();
-  return JSON.stringify({sent: true, messageId: String(message.messageId() || '')});
+  const accepted = message.send();
+  // Outgoing messages have no messageId property, and may vanish after sending.
+  // Never read the object after send: an error here could invite duplicate retries.
+  return JSON.stringify({sent: Boolean(accepted), messageId: null, deliveryVerified: false});
 }
 `;
 
@@ -146,7 +148,7 @@ function run(argv) {
         title: String(event.summary() || ''),
         startsAt: startsAt.toISOString(),
         endsAt: endsAt ? endsAt.toISOString() : null,
-        allDay: Boolean(event.allDayEvent()),
+        allDay: Boolean(event.alldayEvent()),
         location: String(event.location() || '')
       });
     }
@@ -166,7 +168,7 @@ function run(argv) {
     summary: input.title,
     startDate: new Date(input.start),
     endDate: new Date(input.end),
-    allDayEvent: input.allDay
+    alldayEvent: input.allDay
   };
   if (input.location) properties.location = input.location;
   if (input.notes) properties.description = input.notes;
@@ -190,7 +192,7 @@ function run(argv) {
     if (input.end !== undefined) event.endDate = new Date(input.end);
     if (input.location !== undefined) event.location = input.location;
     if (input.notes !== undefined) event.description = input.notes;
-    if (input.allDay !== undefined) event.allDayEvent = input.allDay;
+    if (input.allDay !== undefined) event.alldayEvent = input.allDay;
   } else if (input.operation === 'delete') {
     Calendar.delete(event);
   } else {
@@ -320,7 +322,7 @@ function textOrUndefined(value, label) {
   return text;
 }
 
-async function runJxa(script, args) {
+export async function runJxa(script, args) {
   try {
     const { stdout } = await execFileAsync(
       '/usr/bin/osascript',
@@ -331,10 +333,12 @@ async function runJxa(script, args) {
   } catch (error) {
     if (error?.killed || error?.signal === 'SIGTERM') {
       throw new Error(
-        'Apple automation timed out after 30 seconds. Grant the app that launches your MCP client permission to control the requested Apple app in System Settings > Privacy & Security > Automation, then retry.'
+        'Apple automation timed out after 30 seconds. The app may have completed part of this operation; inspect its state before retrying a write. If needed, grant the launching client access in System Settings > Privacy & Security > Automation.'
       );
     }
-    const details = [error.stderr, error.message].filter(Boolean).join(' ').trim();
+    // execFile's message embeds argv, including private message/document content.
+    // Report only osascript's diagnostic, never the command or serialized payload.
+    const details = String(error.stderr || error.code || 'Apple Event request failed').trim();
     throw new Error(`Apple automation unavailable: ${details}`);
   }
 }

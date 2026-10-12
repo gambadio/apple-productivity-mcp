@@ -1,309 +1,192 @@
 # Apple Productivity MCP
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![macOS](https://img.shields.io/badge/macOS-only-black.svg)](https://www.apple.com/macos/)
-[![npm version](https://img.shields.io/npm/v/%40gambadio%2Fapple-productivity-mcp.svg)](https://www.npmjs.com/package/@gambadio/apple-productivity-mcp)
+A local macOS MCP server for working with Apple's productivity apps, documents, files, and media from Codex, Claude Code, Claude Desktop, and other stdio MCP clients.
 
-An on-demand, local [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that gives Claude Code and Codex controlled access to Apple Mail, Calendar, and Reminders on macOS.
+**133 tools across 17 groups**, plus optional execution of explicitly allowlisted Shortcuts. Runs on your Mac through Apple's automation interfaces. No hosted service, listening port, subscription, or Apple API key is required.
 
-It uses Apple's built-in automation interface through `/usr/bin/osascript`. The MCP transport is stdio: your MCP client starts the process when it connects and stops it when the session releases it. There is no listening port, background service, or cloud-hosted MCP server.
+[Tool reference](docs/TOOLS.md) · [Machine-readable schemas](docs/tools.json) · [Verification](docs/VERIFICATION.md) · [Source documentation](docs/SOURCES.md) · [Changelog](CHANGELOG.md) · [Publishing](docs/PUBLISHING.md) · [Directory status](docs/DISTRIBUTION.md)
 
-## Features
+## What it can do
 
-| App | Read and discover | Actions |
-| --- | --- | --- |
-| Mail | List accounts and mailboxes, list message metadata, read a message | Send, mark read/unread, flag/unflag, move, delete |
-| Calendar | List calendars, list events in a time range | Create, update, delete |
-| Reminders | List reminder lists, list reminders | Create, update, complete, delete |
+| App / group | Tools | Coverage |
+| --- | ---: | --- |
+| Mail | 12 | Accounts and mailboxes; message metadata/body; sender/subject search; visible drafts; send; read/flag status; move/trash; mailbox creation; attachments. |
+| Calendar | 12 | Calendars and events; create/update/delete events; event notes, attendees and recurrence; calendar creation/rename/deletion; display alarms and event URLs. |
+| Reminders | 15 | Accounts/lists; reminders and title search; notes, priorities and due dates; create/update/delete; list management; complete/reopen; flags and notification dates. |
+| Notes | 9 | Accounts/folders; list/search/read notes; create folders and HTML notes; update and delete unlocked notes. |
+| Contacts | 9 | Search and contact details; groups and members; create contacts/groups; update fields; add/remove group membership. |
+| Pages | 8 | List/open/create documents; read/replace/append body text; save; export PDF/DOCX; close with unsaved-change protection. |
+| Numbers | 11 | Documents, sheets, tables; create tables; read/write bounded cell ranges; save; export PDF/XLSX; close. |
+| Keynote | 9 | Documents and slides; create presentations; add/update title, body and presenter notes; save; export PDF/PPTX; close. |
+| TextEdit | 7 | Documents; create/open/read/replace/append text; save RTF; close. |
+| Safari | 6 | Tabs and page text; open/navigate/close tabs with URL checks; Reading List. |
+| Music | 9 | Playlists, tracks and search; metadata; create playlists and add tracks; playback and volume. |
+| Photos | 9 | Albums/items/search; metadata; create albums; add items; import/export; update metadata. |
+| Messages | 3 | Accounts/chats; send text to an explicit recipient through an explicit account. |
+| Files | 8 | Bounded folder listing; metadata/text; create text files/folders; copy; Spotlight filename search; Finder Trash. |
+| Finder | 2 | Selected item metadata; reveal an allowed path. |
+| Shortcuts | 2 + 1 opt-in | List shortcuts/folders; run only names in the configured allowlist. |
+| System | 2 | Discover installed apps/configuration; launch a known Apple app. |
 
-The server publishes MCP tool annotations for read-only, idempotent, destructive, and open-world behavior. These annotations help compatible clients apply appropriate approval policies; they are not a substitute for reviewing a write action before approving it.
+The original 18 tool names remain supported. Version 3 expands the default catalog; select only the app groups you want below.
+
+**Coverage has boundaries.** Apple does not expose every app feature through scripting. Messages history, Contacts deletion, Pages layout text boxes, full document styling, Calendar invitations, Reminders subtasks/tags/recurrence, arbitrary Safari JavaScript, and private Apple databases are not implemented. There are no dedicated Home, Health, Wallet, Find My, or Freeform editing tools. A user-created, allowlisted Shortcut can bridge supported actions in other apps. The complete input schemas describe exactly what each tool accepts.
 
 ## Requirements
 
-- macOS with Mail, Calendar, and Reminders
-- Node.js 20 or newer
-- Claude Code, Codex CLI/app/IDE extension, or another stdio-capable MCP client
-- Permission for the client that launches the server to automate the relevant Apple apps
+- macOS and Node.js **20 or newer**.
+- The Apple app you want to control must be installed and configured. Pages, Numbers, and Keynote are separate App Store installations.
+- A client supporting local **stdio** MCP servers.
+- macOS Automation permission for the launching client/process to control each app. Some file locations also require Files & Folders access.
 
-## Install from npm
+The server starts when the MCP client connects. Each automation call uses a fixed script and JSON arguments with a timeout. iCloud, Exchange, or other account sync continues to follow the app's own settings.
 
-This is the recommended installation method. No repository clone or global package installation is required. `npx` downloads and caches the published package, and the MCP client launches it as a local stdio child process when a session connects.
+## Install
 
-Confirm that Node.js and `npx` are available:
+### Codex
 
-```bash
-node --version
-npx --version
+```sh
+codex mcp add apple-productivity-local -- \
+  npx -y @gambadio/apple-productivity-mcp@latest
+codex mcp get apple-productivity-local
 ```
-
-The examples use `@latest` so new sessions resolve the newest published release. Replace it with an explicit version such as `@2.1.1` when you want a reproducible, pinned installation.
 
 ### Claude Code
 
-Add the server to your user configuration so it is available in every project:
-
-```bash
+```sh
 claude mcp add --transport stdio --scope user apple-productivity-local -- \
   npx -y @gambadio/apple-productivity-mcp@latest
-```
-
-Verify the registration:
-
-```bash
 claude mcp get apple-productivity-local
-claude mcp list
 ```
 
-Start a new Claude Code session after adding the server. If the name is already registered, remove it with `claude mcp remove apple-productivity-local --scope user` and run the add command again.
+### Claude Desktop and other JSON-configured clients
 
-### Codex app, CLI, and IDE extension
-
-Add the server to Codex's user configuration:
-
-```bash
-codex mcp add apple-productivity-local -- \
-  npx -y @gambadio/apple-productivity-mcp@latest
-```
-
-Verify the registration:
-
-```bash
-codex mcp get apple-productivity-local
-codex mcp list
-```
-
-The Codex app, CLI, and IDE extension share this MCP configuration on the same Mac. Start a new session after installation; restart an already-open app or IDE extension so it reloads the configuration. In the Codex CLI, `/mcp` shows the active servers.
-
-If the name is already registered, run `codex mcp remove apple-productivity-local` and add it again.
-
-### Other local MCP clients
-
-Use these values in any client that can launch a local stdio MCP server:
-
-| Setting | Value |
-| --- | --- |
-| Name | `apple-productivity-local` |
-| Transport | `stdio` |
-| Command | `npx` |
-| Arguments | `-y`, `@gambadio/apple-productivity-mcp@latest` |
-| Environment variables | None |
-| Working directory | None required |
-
-Clients that accept the common JSON configuration shape can use:
+Add this to the client's MCP configuration, then restart it:
 
 ```json
 {
   "mcpServers": {
     "apple-productivity-local": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@gambadio/apple-productivity-mcp@latest"
-      ]
+      "args": ["-y", "@gambadio/apple-productivity-mcp@latest"]
     }
   }
 }
 ```
 
-The outer configuration key and file location vary by client. In a graphical setup screen, select **STDIO** and enter the command and arguments from the table. This pattern applies to local MCP clients such as Claude Desktop, Cursor, Windsurf, Cline, and compatible editors; consult the client's documentation for where it stores MCP configuration.
+For a reproducible install, replace `@latest` with `@3.0.0`. A local `.mcpb` extension can also be built using the [packaging instructions](docs/PUBLISHING.md); artifact availability is recorded on the GitHub release. This package requires execution on the user's Mac and cannot access their apps from a Linux container or remote hosting service.
 
-If a desktop client cannot find `npx`, run this in Terminal:
+## Configuration
 
-```bash
-command -v npx
+All settings are optional. Put them in your MCP client's server environment and start a new MCP process.
+
+| Variable | Default | Behavior |
+| --- | --- | --- |
+| `APPLE_MCP_ENABLED_GROUPS` | All groups | Comma-separated group names from the table above, lowercase: e.g. `mail,calendar,reminders,notes`. Empty means all. Unknown groups fail startup. |
+| `APPLE_MCP_READ_ONLY` | `false` | `1` or `true` registers read-only tools only. `0` or `false` enables the selected groups' write tools as well. |
+| `APPLE_MCP_FILE_ROOTS` | `[]` | JSON array of existing absolute directories for Files tools, Finder reveal, Mail attachment saving, and Shortcut file input. Required when using those operations. Paths resolving outside these roots are rejected. |
+| `APPLE_MCP_SHORTCUTS` | `[]` | JSON array of shortcut names/identifiers permitted to run. An empty list omits `apple_shortcuts_run` entirely. |
+
+Example with Notes, reminders, files, and one permitted Shortcut:
+
+```json
+{
+  "mcpServers": {
+    "apple-productivity-local": {
+      "command": "npx",
+      "args": ["-y", "@gambadio/apple-productivity-mcp@3.0.0"],
+      "env": {
+        "APPLE_MCP_ENABLED_GROUPS": "system,notes,reminders,files,finder,shortcuts",
+        "APPLE_MCP_FILE_ROOTS": "[\"/Users/YOUR_NAME/Documents\"]",
+        "APPLE_MCP_SHORTCUTS": "[\"Prepare daily note\"]"
+      }
+    }
+  }
+}
 ```
 
-Then replace `"command": "npx"` with the returned absolute path, for example `"command": "/usr/local/bin/npx"`.
+Replace `YOUR_NAME` and the shortcut name with values that exist on your Mac. An iCloud Drive directory can be included using its real local absolute path.
 
-Restart the client or open a new session after changing its MCP configuration. Clients that support only remote HTTP servers cannot run this MCP directly because Apple Productivity MCP intentionally uses local stdio and macOS automation.
+File roots constrain the generic file tools listed above; they are **not a sandbox for Apple apps**. iWork/TextEdit open/save/export and Photos import/export use explicit paths under the macOS permissions of those apps. Shortcuts may perform any action already contained in the allowed shortcut, including sending messages or changing data elsewhere. Inspect a shortcut before allowlisting it. App-group filtering and read-only mode control the exposed tool surface; MCP annotations are hints for clients, not an authorization system.
 
-You do **not** need to run `npm start`, install the package globally, keep a terminal open, configure an API key, or expose a network port.
+## Example requests
 
-## Install from source
+- “Find reminders with ‘invoice’ in the title, then show their notes and due dates.”
+- “Create a Notes folder in this account and put my meeting summary in it.”
+- “Read this Pages document and export a PDF beside it.”
+- “List the sheets and tables in my Numbers workbook, then fill cells B2:D6 with these values.”
+- “Add a Keynote slide with this title, body, and presenter notes.”
+- “Find Mail messages from this sender and save the selected attachment in my allowed Documents folder.”
+- “List my Photos albums and export these selected items into an empty folder.”
+- “Run my allowlisted ‘Prepare daily note’ shortcut.”
 
-Use a source checkout when developing the server or when you want to run a specific Git commit.
+Start with discovery tools. Use returned IDs/names and inspect the tool schema for exact fields. `apple_system_capabilities` identifies installed apps but does not pre-authorize them or prove permissions. Write requests act on real data, so name the intended target and changes explicitly.
 
-Clone the repository and install its locked dependencies:
+## Data handling and safeguards
 
-```bash
-git clone https://github.com/gambadio/apple-productivity-mcp.git
-cd apple-productivity-mcp
-npm ci
-```
-
-Capture the absolute paths that the MCP clients should store:
-
-```bash
-APPLE_MCP_NODE="$(command -v node)"
-APPLE_MCP_SERVER="$(pwd)/src/index.js"
-```
-
-Paths containing spaces are supported. Keep the quotes in the commands below.
-
-### Claude Code with a source checkout
-
-Install the server for your user account:
-
-```bash
-claude mcp add --transport stdio --scope user apple-productivity-local -- \
-  "$APPLE_MCP_NODE" "$APPLE_MCP_SERVER"
-```
-
-Verify the registration:
-
-```bash
-claude mcp get apple-productivity-local
-claude mcp list
-```
-
-### Codex with a source checkout
-
-Install the same local stdio server in Codex:
-
-```bash
-codex mcp add apple-productivity-local -- \
-  "$APPLE_MCP_NODE" "$APPLE_MCP_SERVER"
-```
-
-Verify the registration:
-
-```bash
-codex mcp get apple-productivity-local
-codex mcp list
-```
-
-Codex stores this in its user configuration, shared by the Codex app, CLI, and IDE extension on the same host. Start a new session after installation. If a desktop app or IDE extension was already open, restart it so it reloads the MCP configuration.
-
-You do **not** need to run `npm start` or keep a terminal open. The MCP client launches the source checkout as a child process when it establishes the MCP connection.
-
-## Grant macOS permission
-
-The first real tool call for each Apple app may trigger a macOS Automation prompt. Approve access for the application that launched the MCP server, such as Terminal, iTerm, Claude Code, Codex, or your IDE.
-
-If you denied a prompt or no prompt appears:
-
-1. Open **System Settings → Privacy & Security → Automation**.
-2. Find the application that launches your MCP client.
-3. Enable Mail, Calendar, and Reminders as needed.
-4. Restart the MCP client and try again.
-
-## Try it
-
-Start with the discovery tools so the client learns the exact local names configured on your Mac:
-
-- “List my Apple Mail accounts and mailboxes.”
-- “List my writable Apple calendars.”
-- “List my Apple Reminders lists.”
-- “Show events from all calendars tomorrow.”
-- “Show my incomplete reminders.”
-
-Mail defaults to the account name `iCloud` and mailbox `INBOX` when a caller does not provide names. Use `apple_mail_list_accounts` first if your setup uses different names.
-
-## Tool reference
-
-### Mail
-
-- `apple_mail_list_accounts` — list account names, sender addresses, and mailboxes
-- `apple_mail_list` — list message metadata without reading bodies
-- `apple_mail_get` — read one message, including its body
-- `apple_mail_send` — send a message immediately
-- `apple_mail_update_status` — mark read/unread or flag/unflag
-- `apple_mail_move` — move a message to another mailbox in the same account
-- `apple_mail_delete` — delete a message using Mail.app behavior
-
-### Calendar
-
-- `apple_calendar_list_calendars` — list calendar names and writable status
-- `apple_calendar_list_events` — list overlapping events in an ISO 8601 time range
-- `apple_calendar_create_event` — create an event
-- `apple_calendar_update_event` — update an event by UID
-- `apple_calendar_delete_event` — delete an event by UID
-
-### Reminders
-
-- `apple_reminders_list_lists` — list reminder-list names and IDs
-- `apple_reminders_list` — list reminders, optionally including completed items
-- `apple_reminders_create` — create a reminder
-- `apple_reminders_update` — update a reminder by ID
-- `apple_reminders_complete` — mark a reminder complete
-- `apple_reminders_delete` — delete a reminder by ID
-
-## Privacy and safety
-
-- The MCP server itself has no network listener and stores no credentials or Apple data.
-- Inputs are passed to `osascript` as JSON arguments rather than interpolated into executable JXA source.
-- Mail, Calendar, and Reminders changes can sync through iCloud, CalDAV, Exchange, or another configured provider.
-- “Local MCP” describes where the server runs. Content returned to Claude Code or Codex becomes part of that active model session and may be processed according to that product's data controls.
-- Sending, moving, updating, completing, and deleting are real actions. Review write-tool requests before approving them.
-
-## Update
-
-Registrations using the npm command with `@latest` resolve the latest published version when a new MCP process starts. Start a new Claude Code or Codex session after a release. Pin an explicit version if automatic upgrades are not desirable.
-
-For a source checkout, update in place so the stored absolute path remains valid:
-
-```bash
-cd /absolute/path/to/apple-productivity-mcp
-git pull --ff-only
-npm ci
-npm test
-```
-
-## Remove
-
-```bash
-claude mcp remove apple-productivity-local --scope user
-codex mcp remove apple-productivity-local
-```
-
-Removing the registration does not clear npm's cache, delete a cloned repository, or change Apple data.
+- No server-side account, telemetry service, network listener, or credential storage.
+- Fixed JXA programs receive user values as JSON arguments, without interpolation into executable source. There is no arbitrary code or shell execution tool.
+- New file copies refuse replacement. Text writes and document save/export require an explicit overwrite option to replace a path. Photos exports require an empty folder.
+- Generic file operations require explicit roots and check resolved paths. File deletion goes through Finder Trash; there is no empty-Trash tool.
+- Collection reads and text/cell ranges have limits. Locked Notes are not read or modified. Safari tab mutations compare the expected URL to guard against shifted indices.
+- Read-only mode hides mutations. Every tool declares read-only, destructive, idempotent, and open-world annotations.
+- Email, Messages, document changes, reminders, contacts, and media edits may sync or reach other people. A send result means submission to the app, not independently verified delivery.
+- Timeouts or multi-step errors can leave partial changes. Inspect the target before retrying a write.
+- Data returned to an MCP client becomes part of that client's active model session and is governed by its data controls. Local execution does not mean content stays outside the model session. JSON inputs are visible to local processes with sufficient OS privileges.
 
 ## Development and verification
 
-Install dependencies and run the isolated test suite:
-
-```bash
+```sh
 npm ci
 npm test
+npm run docs:tools
 npm audit --omit=dev
+npm pack --dry-run
 ```
 
-Run the read-only live integration tests after granting Automation permission:
+Tests execute the static automation programs against application fixtures, exercise filesystem boundaries in temporary folders, and initialize the actual stdio MCP server. They do not send messages or edit personal app data.
 
-```bash
+For the existing read-only Mail/Calendar/Reminders integration suite, after granting Automation permission:
+
+```sh
 npm run test:integration
 ```
 
-The default test run skips live integration tests because they access the user's installed Apple applications.
+**Live verification is app-specific.** Pages, Numbers, and Keynote were not installed on the release development Mac; their tools have fixture coverage but no live iWork verification. See [verification results and limitations](docs/VERIFICATION.md) and [implementation sources](docs/SOURCES.md). Do not interpret the tool count as a claim that every operation has been exercised against every app/macOS version.
 
 ## Troubleshooting
 
-### `Apple automation unavailable` or an authorization error
+**Automation unavailable / not authorized / timeout:** open System Settings → Privacy & Security → Automation and permit the relevant Apple app for the launching client. A timeout can also reflect a busy app or slow iCloud data; do not blindly retry writes. Restart the client after permission/configuration changes.
 
-Review **System Settings → Privacy & Security → Automation**, enable the affected Apple app for the process that launches your MCP client, then restart the client.
+**Application cannot be found:** install the app, launch it once, and verify `apple_system_capabilities`. OS process sandboxing can also restrict LaunchServices. Run a local client with the appropriate macOS access.
 
-### `Mail account not found`, `Calendar not found`, or `Reminder list not found`
+**File roots required / path outside allowed roots:** configure `APPLE_MCP_FILE_ROOTS` as a JSON array of existing absolute directories. A symlink cannot be used to escape that list. Create missing parent folders first.
 
-Run the corresponding discovery tool and use the exact returned name. Names are local to your macOS setup and may differ by language or provider.
+**Object not found / ambiguous name:** rediscover the app's current account, list, document, or object ID. Names differ by language/provider. Close or rename duplicate documents before editing by name.
 
-### `spawn ... ENOENT`
+**Contacts has unsaved changes:** save or discard your pending edits in Contacts before using a mutation, because Contacts' scripting save affects all pending changes.
 
-For an npm installation, run `command -v npx` and use the returned absolute path as the configured command. For a source checkout, remove and re-add the MCP registration using fresh values from `command -v node` and `pwd`.
+**Tools missing:** check app-group/read-only settings, start a new session, and verify `mcp get`/`mcp list` in your client. Shortcut execution appears only with a nonempty allowlist. Apps need not be installed for their tools to be advertised.
 
-### npm package cannot be downloaded
+**`spawn ... ENOENT`:** ensure Node and `npx` are accessible to the desktop client's PATH; use the full path returned by `command -v npx` if needed.
 
-Confirm that the public package is reachable and that the client has internet access for the first installation:
+## Update or remove
 
-```bash
-npm view @gambadio/apple-productivity-mcp version
+`@latest` is resolved when a new MCP process starts; restart the client after publishing a release. An existing process continues running its loaded version. To retain the original app scope on v3, set `APPLE_MCP_ENABLED_GROUPS=mail,calendar,reminders`.
+
+```sh
+codex mcp remove apple-productivity-local
+claude mcp remove apple-productivity-local --scope user
 ```
 
-After the package has been downloaded, npm can reuse its local cache for that version.
+Removing registration does not delete Apple data or clear npm's cache.
 
-### Server is registered but tools do not appear
+## Distribution
 
-Run the client's `mcp get`/`mcp list` commands, then start a new session. Restart an already-open desktop app or IDE extension after changing MCP configuration.
+Canonical source: [GitHub](https://github.com/gambadio/apple-productivity-mcp). Package: [npm](https://www.npmjs.com/package/@gambadio/apple-productivity-mcp). Registry identity: `io.github.gambadio/apple-productivity-mcp`.
+
+[Directory status](docs/DISTRIBUTION.md) distinguishes live listings, submissions awaiting review, login requirements, and incompatible or paused destinations. Third-party listing text may lag the source release. Inclusion and recommendation are controlled by those maintainers.
 
 ## License
 
-[MIT](LICENSE)
+MIT. Independent project; not affiliated with or endorsed by Apple.

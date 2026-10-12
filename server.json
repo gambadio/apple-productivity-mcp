@@ -1,17 +1,17 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.gambadio/apple-productivity-mcp",
-  "description": "On-demand local Apple Mail, Calendar, and Reminders MCP server for macOS.",
+  "description": "Local macOS tools for Apple apps, iWork documents, files, media, and Shortcuts.",
   "repository": {
     "url": "https://github.com/gambadio/apple-productivity-mcp",
     "source": "github"
   },
-  "version": "2.1.1",
+  "version": "3.0.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@gambadio/apple-productivity-mcp",
-      "version": "2.1.1",
+      "version": "3.0.0",
       "transport": {
         "type": "stdio"
       }

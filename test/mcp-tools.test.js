@@ -15,7 +15,7 @@ test('the local MCP advertises Apple Mail, Calendar, and Reminders read/write to
   try {
     const result = await client.listTools();
     const names = result.tools.map((tool) => tool.name).sort();
-    assert.deepEqual(names, [
+    const legacyNames = [
       'apple_calendar_create_event',
       'apple_calendar_delete_event',
       'apple_calendar_list_calendars',
@@ -34,7 +34,14 @@ test('the local MCP advertises Apple Mail, Calendar, and Reminders read/write to
       'apple_reminders_list',
       'apple_reminders_list_lists',
       'apple_reminders_update'
-    ]);
+    ];
+    for (const name of legacyNames) assert.ok(names.includes(name), `Legacy tool missing: ${name}`);
+    assert.equal(names.length, 133);
+    assert.equal(new Set(names).size, names.length);
+    for (const tool of result.tools) {
+      assert.ok(tool.inputSchema && tool.description);
+      for (const flag of ['readOnlyHint','destructiveHint','idempotentHint','openWorldHint']) assert.equal(typeof tool.annotations[flag], 'boolean', `${tool.name}: ${flag}`);
+    }
     const readTool = result.tools.find((tool) => tool.name === 'apple_mail_list');
     const sendTool = result.tools.find((tool) => tool.name === 'apple_mail_send');
     const updateTool = result.tools.find((tool) => tool.name === 'apple_mail_update_status');

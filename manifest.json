@@ -1,0 +1,70 @@
+{
+  "manifest_version": "0.3",
+  "name": "apple-productivity-mcp",
+  "display_name": "Apple Productivity MCP",
+  "version": "3.0.0",
+  "description": "Local macOS tools for Apple apps, iWork documents, files, and Shortcuts.",
+  "long_description": "Connect a local MCP client to Apple Mail, Calendar, Reminders, Notes, Contacts, Safari, Music, Photos, Messages, Pages, Numbers, Keynote, TextEdit, Finder, and Shortcuts. Requires macOS and the relevant installed apps. The client launches this stdio server on demand; macOS may ask for Automation permission. File tools and Shortcut execution require explicit configuration. App changes can sync through the user's configured accounts. Returned content becomes part of the active AI session. Independent community project, not affiliated with Apple.",
+  "author": {
+    "name": "Ricardo Kupper",
+    "url": "https://github.com/gambadio"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gambadio/apple-productivity-mcp.git"
+  },
+  "homepage": "https://github.com/gambadio/apple-productivity-mcp",
+  "documentation": "https://github.com/gambadio/apple-productivity-mcp#readme",
+  "support": "https://github.com/gambadio/apple-productivity-mcp/issues",
+  "server": {
+    "type": "node",
+    "entry_point": "src/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/src/index.js"],
+      "env": {
+        "APPLE_MCP_READ_ONLY": "${user_config.read_only}",
+        "APPLE_MCP_ENABLED_GROUPS": "${user_config.enabled_groups}",
+        "APPLE_MCP_FILE_ROOTS": "${user_config.file_roots}",
+        "APPLE_MCP_SHORTCUTS": "${user_config.shortcuts}"
+      }
+    }
+  },
+  "tools_generated": true,
+  "keywords": ["apple", "macos", "productivity", "iwork", "notes", "reminders", "files", "shortcuts"],
+  "license": "MIT",
+  "compatibility": {
+    "platforms": ["darwin"],
+    "runtimes": { "node": ">=20" }
+  },
+  "user_config": {
+    "read_only": {
+      "type": "boolean",
+      "title": "Read-only tools",
+      "description": "Expose only tools marked read-only. Disable to include tools that change apps, documents, or files.",
+      "default": false,
+      "required": false
+    },
+    "enabled_groups": {
+      "type": "string",
+      "title": "Enabled app groups",
+      "description": "Optional comma-separated groups: mail, calendar, reminders, notes, contacts, safari, music, photos, messages, pages, numbers, keynote, textedit, files, finder, shortcuts, system. Leave empty for all groups.",
+      "default": "",
+      "required": false
+    },
+    "file_roots": {
+      "type": "string",
+      "title": "Folders available to file tools",
+      "description": "JSON array of absolute folder paths, for example [\"/Users/yourname/Documents\"]. [] disables file tools. This boundary applies to file and Finder path operations, not document paths handled by Apple apps.",
+      "default": "[]",
+      "required": false
+    },
+    "shortcuts": {
+      "type": "string",
+      "title": "Shortcuts allowed to run",
+      "description": "JSON array of exact Shortcut names. [] disables execution. A permitted Shortcut can perform any actions configured in that Shortcut.",
+      "default": "[]",
+      "required": false
+    }
+  }
+}

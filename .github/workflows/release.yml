@@ -1,0 +1,122 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to release (for example v3.0.0)
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    if: github.repository == 'gambadio/apple-productivity-mcp'
+    runs-on: macos-latest
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Check release identity
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+          if (process.env.RELEASE_TAG !== `v${pkg.version}` || !/^v\d+\.\d+\.\d+$/.test(process.env.RELEASE_TAG)) throw Error('Use a stable vX.Y.Z tag matching package.json.');
+          NODE
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - run: npm audit --omit=dev
+      - name: Validate and build portable desktop bundle
+        run: node scripts/build-mcpb.mjs
+      - name: Pack npm release
+        run: npm pack --json --pack-destination dist > dist/npm-pack.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-${{ env.RELEASE_TAG }}
+          path: dist/*
+          if-no-files-found: error
+      - name: Publish npm using configured trusted publishing
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+          const [packed] = JSON.parse(readFileSync('dist/npm-pack.json', 'utf8'));
+          let existing;
+          try {
+            existing = JSON.parse(execFileSync('npm', ['view', `${pkg.name}@${pkg.version}`, 'dist.integrity', '--json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }));
+          } catch (error) {
+            if (!String(error.stderr).includes('E404')) throw error;
+          }
+          if (existing) {
+            if (existing !== packed.integrity) throw Error('Published npm version differs from the local artifact. Bump the version.');
+            console.log('Matching npm artifact already published; continuing the release.');
+          } else {
+            execFileSync('npm', ['publish', `dist/${packed.filename}`, '--access', 'public'], { stdio: 'inherit' });
+          }
+          const publishedIntegrity = JSON.parse(execFileSync('npm', ['view', `${pkg.name}@${pkg.version}`, 'dist.integrity', '--json'], { encoding: 'utf8' }));
+          if (publishedIntegrity !== packed.integrity) throw Error('npm artifact readback does not match the release.');
+          NODE
+      - name: Install pinned MCP Registry publisher
+        env:
+          MCP_PUBLISHER_VERSION: v1.8.1
+        run: |
+          case "$(uname -m)" in
+            arm64) PUBLISHER_ARCH=arm64; PUBLISHER_SHA=e45e520892460732a4bdf37255576415d4a53ec171f8b913faf15bb1aef7cb77 ;;
+            x86_64) PUBLISHER_ARCH=amd64; PUBLISHER_SHA=88126981225e7714fcc6b7a10cdba4a80ae5901e9740a8c06d0d5195c8bc294c ;;
+            *) exit 1 ;;
+          esac
+          PUBLISHER_FILE="mcp-publisher_darwin_${PUBLISHER_ARCH}.tar.gz"
+          curl --fail --location --silent --show-error "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/${PUBLISHER_FILE}" -o "$RUNNER_TEMP/$PUBLISHER_FILE"
+          printf '%s  %s\n' "$PUBLISHER_SHA" "$RUNNER_TEMP/$PUBLISHER_FILE" | shasum -a 256 --check
+          tar -xzf "$RUNNER_TEMP/$PUBLISHER_FILE" -C "$RUNNER_TEMP" mcp-publisher
+      - name: Authenticate and publish MCP Registry metadata
+        run: |
+          "$RUNNER_TEMP/mcp-publisher" validate
+          "$RUNNER_TEMP/mcp-publisher" login github-oidc
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          import { isDeepStrictEqual } from 'node:util';
+          const server = JSON.parse(readFileSync('server.json', 'utf8'));
+          const url = `https://registry.modelcontextprotocol.io/v0.1/servers/${encodeURIComponent(server.name)}/versions/${encodeURIComponent(server.version)}`;
+          const existing = await fetch(url);
+          if (existing.ok) {
+            if (!isDeepStrictEqual((await existing.json()).server, server)) throw Error('Registry version exists with different metadata. Bump the version.');
+            console.log('Matching Registry metadata already published.');
+          } else if (existing.status === 404) {
+            execFileSync(`${process.env.RUNNER_TEMP}/mcp-publisher`, ['publish'], { stdio: 'inherit' });
+          } else {
+            throw Error(`Registry read failed: ${existing.status}`);
+          }
+          const verified = await fetch(url);
+          if (!verified.ok || (await verified.json()).server.version !== server.version) throw Error('Registry readback failed.');
+          NODE
+      - name: Create GitHub release and attach artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" --json tagName >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --verify-tag --title "Apple Productivity MCP $RELEASE_TAG" --generate-notes
+          fi
+          gh release upload "$RELEASE_TAG" dist/*.mcpb dist/*.sha256 dist/*.tgz --clobber
